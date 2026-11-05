@@ -28,8 +28,8 @@ public class Demo extends GameApp {
 
     @Override
     protected void init() {
-        shader = Shader.load("shaders/basic.vert", "shaders/basic.frag");
-        oceanShader = Shader.load("shaders/ocean.vert", "shaders/ocean.frag");
+        shader = Shader.load("shaders/engine/basic.vert", "shaders/engine/basic.frag");
+        oceanShader = Shader.load("shaders/game/ocean.vert", "shaders/game/ocean.frag");
 
         cubeMesh = Mesh.cube();
         oceanMesh = Mesh.grid(256, 200.0f, 1.0f);
