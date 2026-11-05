@@ -1,0 +1,35 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+def lwjglVersion = '3.3.4'
+def jomlVersion  = '1.10.8'
+
+def os   = System.getProperty('os.name').toLowerCase()
+def arch = System.getProperty('os.arch').toLowerCase()
+def natives = os.contains('win') ? 'natives-windows'
+        : os.contains('mac') ? ((arch.contains('aarch64') || arch.contains('arm')) ? 'natives-macos-arm64' : 'natives-macos')
+        : 'natives-linux'
+
+repositories { mavenCentral() }
+
+dependencies {
+    implementation platform("org.lwjgl:lwjgl-bom:$lwjglVersion")
+    implementation 'org.lwjgl:lwjgl'
+    implementation 'org.lwjgl:lwjgl-glfw'
+    implementation 'org.lwjgl:lwjgl-opengl'
+    implementation 'org.lwjgl:lwjgl-stb'
+    runtimeOnly "org.lwjgl:lwjgl::$natives"
+    runtimeOnly "org.lwjgl:lwjgl-glfw::$natives"
+    runtimeOnly "org.lwjgl:lwjgl-opengl::$natives"
+    runtimeOnly "org.lwjgl:lwjgl-stb::$natives"
+    implementation "org.joml:joml:$jomlVersion"
+}
+
+java { toolchain { languageVersion = JavaLanguageVersion.of(17) } }
+
+application {
+    mainClass = 'demo.Demo'
+    applicationDefaultJvmArgs = ['--enable-native-access=ALL-UNNAMED'] + (os.contains('mac') ? ['-XstartOnFirstThread'] : [])
+}
