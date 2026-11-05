@@ -2,112 +2,217 @@ package engine.gfx;
 
 import engine.scene.Entity;
 import engine.scene.Scene;
-import org.joml.Matrix4f;
-import org.lwjgl.system.MemoryStack;
+import org.joml.Vector3f;
 
-import java.nio.IntBuffer;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 
-import static org.lwjgl.opengl.GL33.*;
+import static org.lwjgl.opengl.GL33C.*;
 
-public class Renderer {
-    private Framebuffer fb;
-    private Shader fogShader;
+public final class Renderer implements AutoCloseable {
+    private static final int DEPTH_UNIT = 2;
+
+    private Framebuffer sceneFb, depthCopy, pingA, pingB;
+    private PostEffect fogEffect;
     private int fullscreenVao;
 
-    private void ensureInit() {
-        if (fogShader == null) {
-            fogShader = Shader.load(
-                    "shaders/fullscreen.vert",
-                    "shaders/volumetric_fog.frag");
-        }
-        if (fullscreenVao == 0) {
-            fullscreenVao = glGenVertexArrays();
-        }
-    }
+    private final List<PostEffect> effects = new ArrayList<>();
+    private final List<Entity> opaque = new ArrayList<>();
+    private final List<Entity> transparent = new ArrayList<>();
+    private final FrameContext frame = new FrameContext();
+    private final Vector3f camPos = new Vector3f();
+    private final Comparator<Entity> backToFront = (a, b) -> Float.compare(
+            b.transform.position.distanceSquared(camPos),
+            a.transform.position.distanceSquared(camPos));
 
-    private void ensureFramebuffer(int w, int h) {
-        if (fb == null || fb.width != w || fb.height != h) {
-            fb = new Framebuffer(w, h);
-        }
-    }
+    public List<PostEffect> effects() { return effects; }
 
-    public void render(Scene scene, float aspect) {
-        render(scene, aspect, 0);
-    }
+    public PostEffect fog() { return fogEffect; }
 
-    public void render(Scene scene, float aspect, float time) {
+    public void render(Scene scene, int width, int height, float time) {
+        if (width <= 0 || height <= 0) return; // minimised window
+
         ensureInit();
+        ensureTargets(width, height);
 
-        int vpW, vpH;
-        try (MemoryStack stack = MemoryStack.stackPush()) {
-            IntBuffer vp = stack.mallocInt(4);
-            glGetIntegerv(GL_VIEWPORT, vp);
-            vpW = vp.get(2);
-            vpH = vp.get(3);
-        }
-        ensureFramebuffer(vpW, vpH);
+        frame.scene = scene;
+        frame.view = scene.camera.view();
+        frame.proj = scene.camera.projection((float) width / height);
+        frame.invViewProj.set(frame.proj).mul(frame.view).invert();
+        frame.screenSize.set(width, height);
+        frame.time = time;
+        frame.width = width;
+        frame.height = height;
+        camPos.set(scene.camera.position);
 
-        Matrix4f view  = scene.camera.view();
-        Matrix4f proj  = scene.camera.projection(aspect);
-        Matrix4f invVP = new Matrix4f(proj).mul(view).invert();
+        sortEntities(scene);
 
-        fb.bind();
-
+        sceneFb.bind();
         glClearColor(scene.fogColor.x, scene.fogColor.y, scene.fogColor.z, 1f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glEnable(GL_DEPTH_TEST);
+        drawList(opaque, false);
 
-        Shader lastShader = null;
+        if (!transparent.isEmpty()) {
+            sceneFb.copyDepthTo(depthCopy);
+            sceneFb.bind(); // copyDepthTo leaves the default framebuffer bound
+
+            glActiveTexture(GL_TEXTURE0 + DEPTH_UNIT);
+            glBindTexture(GL_TEXTURE_2D, depthCopy.depthTex);
+            glActiveTexture(GL_TEXTURE0);
+
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            drawList(transparent, true); // depth writes stay on so fog sees the water surface
+            glDisable(GL_BLEND);
+        }
+        sceneFb.unbind();
+
+        postProcess(width, height);
+    }
+
+    private void sortEntities(Scene scene) {
+        opaque.clear();
+        transparent.clear();
         for (Entity e : scene.entities()) {
             if (!e.visible) continue;
-            Material m = e.material;
-            Shader s   = m.shader;
+            (e.transparent ? transparent : opaque).add(e);
+        }
+        if (transparent.size() > 1) transparent.sort(backToFront);
+    }
 
-            if (s != lastShader) {
+    private void drawList(List<Entity> list, boolean transparentPass) {
+        Scene scene = frame.scene;
+        Shader last = null;
+        for (Entity e : list) {
+            Material m = e.material;
+            Shader s = m.shader;
+
+            if (s != last) {
                 s.bind()
-                        .set("uView",     view)
-                        .set("uProj",     proj)
+                        .set("uView", frame.view)
+                        .set("uProj", frame.proj)
                         .set("uLightDir", scene.lightDir)
-                        .set("uViewPos",  scene.camera.position)
-                        .set("uTime",     time);
-                lastShader = s;
+                        .set("uViewPos", scene.camera.position)
+                        .set("uTime", frame.time);
+                if (transparentPass) {
+                    s.set("uSceneDepth", DEPTH_UNIT)
+                            .set("uScreenSize", frame.screenSize)
+                            .set("uInvViewProj", frame.invViewProj)
+                            .set("uNear", scene.camera.near)
+                            .set("uFar", scene.camera.far);
+                }
+                last = s;
             }
 
             m.apply();
             s.set("uModel", e.transform.matrix());
             e.mesh.draw();
         }
-        if (lastShader != null) lastShader.unbind();
+        if (last != null) last.unbind();
+    }
 
-        fb.unbind();
+    private void postProcess(int w, int h) {
+        int enabled = 0;
+        for (PostEffect e : effects) if (e.enabled) enabled++;
+
+        if (enabled == 0) {
+            sceneFb.blitColorToScreen();
+            return;
+        }
+        if (enabled > 1 && pingA == null) {
+            pingA = Framebuffer.colorOnly(w, h);
+            pingB = Framebuffer.colorOnly(w, h);
+        }
 
         glDisable(GL_DEPTH_TEST);
-        glViewport(0, 0, vpW, vpH);
+        glDisable(GL_CULL_FACE);
 
-        fogShader.bind()
-                .set("uColorTex",         0)
-                .set("uDepthTex",         1)
-                .set("uInvViewProj",      invVP)
-                .set("uCameraPos",        scene.camera.position)
-                .set("uLightDir",         scene.lightDir)
-                .set("uFogColor",         scene.fogColor)
-                .set("uFogDensity",       scene.fogDensity)
-                .set("uFogHeightFalloff", scene.fogHeightFalloff)
-                .set("uFogBaseHeight",    scene.fogBaseHeight)
-                .set("uNoiseScale",       scene.fogNoiseScale)
-                .set("uMaxDistance",      scene.fogMaxDistance)
-                .set("uTime",             time);
+        Framebuffer src = sceneFb;
+        int done = 0;
+        for (PostEffect e : effects) {
+            if (!e.enabled) continue;
+            boolean last = ++done == enabled;
 
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, fb.colorTex);
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, fb.depthTex);
+            Framebuffer dst = null;
+            if (!last) dst = (src == pingA) ? pingB : pingA;
 
-        glBindVertexArray(fullscreenVao);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
-        glBindVertexArray(0);
+            if (dst != null) {
+                dst.bind();
+            } else {
+                glBindFramebuffer(GL_FRAMEBUFFER, 0);
+                glViewport(0, 0, w, h);
+            }
 
-        fogShader.unbind();
+            e.shader.bind();
+            e.configure(frame);
+            e.shader.set("uColorTex", 0).set("uDepthTex", 1);
+
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, src.colorTex);
+            glActiveTexture(GL_TEXTURE1);
+            glBindTexture(GL_TEXTURE_2D, sceneFb.depthTex);
+            glActiveTexture(GL_TEXTURE0);
+
+            glBindVertexArray(fullscreenVao);
+            glDrawArrays(GL_TRIANGLES, 0, 3);
+            glBindVertexArray(0);
+            e.shader.unbind();
+
+            if (dst != null) src = dst;
+        }
+
+        glEnable(GL_CULL_FACE);
         glEnable(GL_DEPTH_TEST);
+    }
+
+    // ---------------------------------------------------------------- setup / teardown
+
+    private void ensureInit() {
+        if (fullscreenVao != 0) return;
+        fullscreenVao = glGenVertexArrays();
+
+        fogEffect = new PostEffect(
+                Shader.load("shaders/fullscreen.vert", "shaders/volumetric_fog.frag"),
+                (s, f) -> {
+                    Scene sc = f.scene;
+                    s.set("uInvViewProj", f.invViewProj)
+                            .set("uCameraPos", sc.camera.position)
+                            .set("uLightDir", sc.lightDir)
+                            .set("uFogColor", sc.fogColor)
+                            .set("uFogDensity", sc.fogDensity)
+                            .set("uFogHeightFalloff", sc.fogHeightFalloff)
+                            .set("uFogBaseHeight", sc.fogBaseHeight)
+                            .set("uNoiseScale", sc.fogNoiseScale)
+                            .set("uMaxDistance", sc.fogMaxDistance)
+                            .set("uTime", f.time);
+                });
+        effects.add(0, fogEffect);
+    }
+
+    private void ensureTargets(int w, int h) {
+        if (sceneFb != null && sceneFb.width == w && sceneFb.height == h) return;
+        closeTargets();
+        sceneFb = new Framebuffer(w, h);
+        depthCopy = Framebuffer.depthOnly(w, h);
+        // pingA / pingB are created on demand in postProcess()
+    }
+
+    private void closeTargets() {
+        if (sceneFb != null) sceneFb.close();
+        if (depthCopy != null) depthCopy.close();
+        if (pingA != null) pingA.close();
+        if (pingB != null) pingB.close();
+        sceneFb = depthCopy = pingA = pingB = null;
+    }
+
+    @Override
+    public void close() {
+        closeTargets();
+        if (fogEffect != null) fogEffect.close();
+        if (fullscreenVao != 0) glDeleteVertexArrays(fullscreenVao);
+        fogEffect = null;
+        fullscreenVao = 0;
     }
 }

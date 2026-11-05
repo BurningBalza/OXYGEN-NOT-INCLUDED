@@ -96,7 +96,7 @@ public class Demo extends GameApp {
 
     @Override
     protected void render() {
-        renderer.render(scene, window.aspect(), frameTime);
+        renderer.render(scene, window.width(), window.height(), frameTime);
     }
 
     @Override
@@ -108,6 +108,8 @@ public class Demo extends GameApp {
         if (oceanMesh != null) oceanMesh.close();
 
         if (checker != null) checker.close();
+
+        renderer.close();
     }
 
     public static void main(String[] args) {

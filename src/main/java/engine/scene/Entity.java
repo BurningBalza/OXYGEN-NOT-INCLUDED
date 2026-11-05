@@ -3,14 +3,13 @@ package engine.scene;
 import engine.gfx.Material;
 import engine.gfx.Mesh;
 
-import javax.swing.*;
-
 public final class Entity {
     public String name = "entity";
     public final Transform transform = new Transform();
     public Mesh mesh;
     public Material material;
     public boolean visible = true;
+    public boolean transparent = false;
 
     public Entity(Mesh mesh, Material material) {
         this.mesh = mesh;
@@ -29,6 +28,11 @@ public final class Entity {
 
     public Entity scaled(float scale) {
         transform.setScale(scale);
+        return this;
+    }
+
+    public Entity transparent() {
+        this.transparent = true;
         return this;
     }
 
