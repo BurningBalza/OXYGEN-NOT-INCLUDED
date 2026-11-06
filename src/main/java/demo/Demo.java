@@ -3,6 +3,7 @@ package demo;
 import engine.gfx.*;
 import engine.core.*;
 import engine.scene.*;
+import game.Waves;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -23,6 +24,7 @@ public class Demo extends GameApp {
     private Texture checker;
 
     private Entity oceanEntity;
+    private Entity raft;
 
     private float frameTime;
 
@@ -60,6 +62,13 @@ public class Demo extends GameApp {
             ));
         }
 
+        raft = scene.add(
+                new Entity(cubeMesh, new Material(shader).tint(0.45f, 0.3f, 0.18f))
+                        .named("raft")
+                        .at(0f, 0f, -12f)
+        );
+        raft.transform.setScale(2f, 0.3f, 4f);
+
         scene.camera.position.set(0, 2, 6);
         Input.captureMouse(true);
     }
@@ -92,6 +101,21 @@ public class Demo extends GameApp {
                     0.2f
             );
         }
+
+        float x = raft.transform.position.x;
+        float z = raft.transform.position.z;
+        float front = Waves.height(x, z - 2f, frameTime);
+        float back = Waves.height(x, z + 2f, frameTime);
+        float left = Waves.height(x - 1f, z, frameTime);
+        float right = Waves.height(x + 1f, z, frameTime);
+
+        float water = (front + back + left + right) / 4f;
+        raft.transform.position.y = oceanEntity.transform.position.y + water + 0.1f;
+        raft.transform.setEuler(
+                (float) Math.atan2(front - back, 4f),
+                0f,
+                (float) Math.atan2(right - left, 2f)
+        );
     }
 
     @Override
