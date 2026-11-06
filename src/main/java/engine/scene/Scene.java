@@ -14,7 +14,7 @@ public final class Scene {
 
     private final List<Entity> entities = new ArrayList<>();
 
-    public final Vector3f fogColor = new Color(0x696568).toNormalisedVector();
+    public final Vector3f fogColor = new Color(0x18151b).toNormalisedVector();
     public float fogDensity = 0.12f;
     public float fogHeightFalloff = 0.15f;
     public float fogBaseHeight = 2.0f;
