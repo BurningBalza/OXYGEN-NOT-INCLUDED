@@ -113,6 +113,6 @@ public class Demo extends GameApp {
     }
 
     public static void main(String[] args) {
-        new Demo().run("OXYGEN NOT INCLUDED", 1280, 720);
+        new Demo().run("Abyssaline", 1280, 720);
     }
 }
