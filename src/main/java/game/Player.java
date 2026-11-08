@@ -27,7 +27,7 @@ public class Player {
     private final Vector3f local = new Vector3f();
     private final Vector3f deckPoint = new Vector3f();
 
-    public void update(float dt, Camera cam, Raft raft, float seaLevel, float time) {
+    public void update(float delta, Camera cam, Raft raft, float seaLevel, float time) {
         Vector3f forward = cam.forward();
         Vector3f right = cam.right();
         float flat = (float) Math.sqrt(forward.x * forward.x + forward.z * forward.z);
@@ -42,14 +42,14 @@ public class Player {
         float length = (float) Math.sqrt(moveX * moveX + moveZ * moveZ);
         if (length > 0f) {
             float speed = swimming ? swimSpeed : Input.isDown(GLFW_KEY_LEFT_SHIFT) ? runSpeed : walkSpeed;
-            position.x += moveX / length * speed * dt;
-            position.z += moveZ / length * speed * dt;
+            position.x += moveX / length * speed * delta;
+            position.z += moveZ / length * speed * delta;
         }
 
         if (Input.wasPressed(GLFW_KEY_SPACE) && (onGround || swimming)) velocityY = jumpSpeed;
 
-        velocityY -= gravity * dt;
-        position.y += velocityY * dt;
+        velocityY -= gravity * delta;
+        position.y += velocityY * delta;
 
         boolean wasOnGround = onGround;
         onGround = false;
@@ -81,4 +81,5 @@ public class Player {
         raft.deck.transform.matrix().transformPosition(deckPoint.set(local.x, raft.thickness / 2f, local.z));
         return deckPoint.y;
     }
+
 }

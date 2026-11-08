@@ -62,12 +62,12 @@ void main() {
     float brush = fbm(flow * vec2(2.8, 0.65));
     float brushMask = smoothstep(0.52, 0.78, brush);
 
-    vec3 deep = vec3(0.008, 0.045, 0.12);
-    vec3 ocean = vec3(0.012, 0.13, 0.25);
-    vec3 blue = vec3(0.025, 0.27, 0.40);
-    vec3 turquoise = vec3(0.08, 0.43, 0.49);
-    vec3 light = vec3(0.52, 0.76, 0.72);
-    vec3 foamColour = vec3(0.78, 0.88, 0.79);
+vec3 deep = vec3(0.043, 0.039, 0.047);
+vec3 ocean = vec3(0.125, 0.102, 0.137);
+vec3 blue = vec3(0.196, 0.125, 0.20);
+vec3 turquoise = vec3(0.322, 0.133, 0.251);
+vec3 light = vec3(0.478, 0.122, 0.176);
+vec3 foamColour = vec3(0.561, 0.231, 0.145);
 
     vec3 colour = mix(deep, ocean, smoothstep(0.12, 0.72, broad));
     colour = mix(colour, blue, smoothstep(0.32, 0.78, medium) * 0.7);
@@ -90,11 +90,11 @@ void main() {
     colour = mix(colour, light, highlights * 0.4);
     colour = mix(colour, foamColour, foam * 0.55);
 
-    colour += vec3(0.65, 0.82, 0.78) * specular;
+    colour += vec3(0.70, 0.55, 0.58) * specular;
 
     colour = mix(
             colour,
-            vec3(0.12, 0.38, 0.48),
+            vec3(0.22, 0.12, 0.20),
             fresnel * 0.35
     );
 
