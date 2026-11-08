@@ -4,6 +4,7 @@ import org.lwjgl.glfw.GLFWErrorCallback;
 import org.lwjgl.glfw.GLFWVidMode;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.system.MemoryStack;
+import org.lwjgl.system.Platform;
 
 import java.nio.IntBuffer;
 
@@ -18,7 +19,7 @@ public final class Window implements AutoCloseable {
 
     public Window(String title, int width, int height, boolean vsync) {
         GLFWErrorCallback.createPrint(System.err).set();
-        glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_X11);
+        if (Platform.get() == Platform.LINUX) glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_X11);
         if (!glfwInit()) throw new IllegalStateException("Unable to initialize GLFW");
 
         glfwDefaultWindowHints();

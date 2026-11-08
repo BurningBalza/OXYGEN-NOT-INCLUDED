@@ -3,6 +3,8 @@ package demo;
 import engine.gfx.*;
 import engine.core.*;
 import engine.scene.*;
+import game.Player;
+import game.Raft;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,8 +23,14 @@ public class Demo extends GameApp {
     private Mesh oceanMesh;
 
     private Texture checker;
+    private Texture raftTop;
+    private Texture raftSide;
 
     private Entity oceanEntity;
+    private Raft raft;
+
+    private final Player player = new Player();
+    private boolean flying;
 
     private float frameTime;
 
@@ -60,6 +68,12 @@ public class Demo extends GameApp {
             ));
         }
 
+        raftTop = Texture.load("textures/raft_topandbottom.png", true);
+        raftSide = Texture.load("textures/raft_side.png", true);
+        raft = new Raft(scene, shader, raftTop, raftSide, 0f, -12f);
+        raft.update(0f, oceanEntity.transform.position.y);
+        player.position.set(raft.deck.transform.position).add(0f, 0.5f, 0f);
+
         scene.camera.position.set(0, 2, 6);
         Input.captureMouse(true);
     }
@@ -75,14 +89,25 @@ public class Demo extends GameApp {
         Camera cam = scene.camera;
         cam.look(Input.mouseDX(), Input.mouseDY());
 
-        float speed = (Input.isDown(GLFW_KEY_LEFT_SHIFT) ? 12f : 5f) * dt;
+        if (Input.wasPressed(GLFW_KEY_F)) {
+            flying = !flying;
+            if (!flying) player.position.set(cam.position).sub(0f, player.eyeHeight, 0f);
+        }
 
-        if (Input.isDown(GLFW_KEY_W)) cam.moveForward(speed);
-        if (Input.isDown(GLFW_KEY_S)) cam.moveForward(-speed);
-        if (Input.isDown(GLFW_KEY_D)) cam.moveRight(speed);
-        if (Input.isDown(GLFW_KEY_A)) cam.moveRight(-speed);
-        if (Input.isDown(GLFW_KEY_SPACE)) cam.moveUp(speed);
-        if (Input.isDown(GLFW_KEY_LEFT_CONTROL)) cam.moveUp(-speed);
+        raft.update(frameTime, oceanEntity.transform.position.y);
+
+        if (flying) {
+            float speed = (Input.isDown(GLFW_KEY_LEFT_SHIFT) ? 12f : 5f) * dt;
+
+            if (Input.isDown(GLFW_KEY_W)) cam.moveForward(speed);
+            if (Input.isDown(GLFW_KEY_S)) cam.moveForward(-speed);
+            if (Input.isDown(GLFW_KEY_D)) cam.moveRight(speed);
+            if (Input.isDown(GLFW_KEY_A)) cam.moveRight(-speed);
+            if (Input.isDown(GLFW_KEY_SPACE)) cam.moveUp(speed);
+            if (Input.isDown(GLFW_KEY_LEFT_CONTROL)) cam.moveUp(-speed);
+        } else {
+            player.update(dt, cam, raft, oceanEntity.transform.position.y, frameTime);
+        }
 
         for (int i = 0; i < spinners.size(); i++) {
             spinners.get(i).transform.rotate(
@@ -108,11 +133,15 @@ public class Demo extends GameApp {
         if (oceanMesh != null) oceanMesh.close();
 
         if (checker != null) checker.close();
+        if (raftTop != null) raftTop.close();
+        if (raftSide != null) raftSide.close();
+
+        if (raft != null) raft.close();
 
         renderer.close();
     }
 
     public static void main(String[] args) {
-        new Demo().run("OXYGEN NOT INCLUDED", 1280, 720);
+        new Demo().run("Abyssaline", 1280, 720);
     }
 }

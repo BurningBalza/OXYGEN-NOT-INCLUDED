@@ -47,8 +47,8 @@ public final class Input {
     public static boolean wasPressed(int key) { return key >= 0 && key <= GLFW_KEY_LAST && pressed[key]; }
     public static boolean wasReleased(int key) { return key >= 0 && key <= GLFW_KEY_LAST && released[key]; }
 
-    public static boolean isMouseDown(int button) { return mDown[button]; }
-    public static boolean wasMousePressed(int button) { return mPressed[button]; }
+    public static boolean isMouseDown(int button) { return button >= 0 && button <= GLFW_MOUSE_BUTTON_LAST && mDown[button]; }
+    public static boolean wasMousePressed(int button) { return button >= 0 && button <= GLFW_MOUSE_BUTTON_LAST && mPressed[button]; }
 
     public static float mouseX() { return (float) mouseX; }
     public static float mouseY() { return (float) mouseY; }
