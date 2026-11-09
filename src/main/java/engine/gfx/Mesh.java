@@ -1,5 +1,6 @@
 package engine.gfx;
 
+import org.joml.Vector3f;
 import org.lwjgl.system.MemoryUtil;
 
 import java.nio.FloatBuffer;
@@ -14,6 +15,9 @@ public final class Mesh implements AutoCloseable {
     private final int vao, vbo, ebo, indexCount;
 
     public final float radius;
+
+    public final Vector3f boundCenter = new Vector3f();
+    public float boundRadius;
 
     public Mesh(float[] vertices, int[] indices, int... layout) {
         indexCount = indices.length;
@@ -76,6 +80,16 @@ public final class Mesh implements AutoCloseable {
         glDeleteBuffers(vbo);
         glDeleteBuffers(ebo);
         glDeleteVertexArrays(vao);
+    }
+
+    public void computeBounds(float[] verts, int stride) {
+        Vector3f min = new Vector3f(Float.MAX_VALUE), max = new Vector3f(-Float.MAX_VALUE);
+        for (int i = 0; i + 2 < verts.length; i += stride) {
+            min.min(new Vector3f(verts[i], verts[i + 1], verts[i + 2]));
+            max.max(new Vector3f(verts[i], verts[i + 1], verts[i + 2]));
+        }
+        min.add(max, boundCenter).mul(0.5f);
+        boundRadius = boundCenter.distance(max);
     }
 
     public static Mesh cube() {

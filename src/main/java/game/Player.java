@@ -18,16 +18,23 @@ public class Player {
     public float gravity = 20f;
     public float swimDepth = 1.0f;
 
+    public float groundSmoothing = 12f;
+    public float airDecay = 10f;
+
     public boolean onGround;
     public boolean swimming;
 
     private float velocityY;
+    private float renderY;
+    private boolean renderInit;
 
     private final Matrix4f toRaft = new Matrix4f();
     private final Vector3f local = new Vector3f();
     private final Vector3f deckPoint = new Vector3f();
 
     public void update(float delta, Camera cam, Raft raft, float seaLevel, float time) {
+        float prevY = position.y;
+
         Vector3f forward = cam.forward();
         Vector3f right = cam.right();
         float flat = (float) Math.sqrt(forward.x * forward.x + forward.z * forward.z);
@@ -70,7 +77,26 @@ public class Player {
             swimming = true;
         }
 
-        cam.position.set(position.x, position.y + eyeHeight, position.z);
+        updateRenderY(delta, prevY);
+
+        cam.position.set(position.x, renderY + eyeHeight, position.z);
+    }
+
+    private void updateRenderY(float delta, float prevY) {
+        if (!renderInit) {
+            renderY = position.y;
+            renderInit = true;
+            return;
+        }
+
+        if (onGround || swimming) {
+            float t = 1f - (float) Math.exp(-groundSmoothing * delta);
+            renderY += (position.y - renderY) * t;
+        } else {
+            float offset = renderY - prevY;
+            offset *= (float) Math.exp(-airDecay * delta);
+            renderY = position.y + offset;
+        }
     }
 
     private float deckHeight(Raft raft) {
@@ -81,5 +107,4 @@ public class Player {
         raft.deck.transform.matrix().transformPosition(deckPoint.set(local.x, raft.thickness / 2f, local.z));
         return deckPoint.y;
     }
-
 }
